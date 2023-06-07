@@ -319,18 +319,22 @@ class Recorder(object):
                     sids = np.array(sids, dtype=int)
                     segment.spiketrains = neo.spiketrainlist.SpikeTrainList.from_spike_time_array(
                         times, id_array,
-                        sids,
+                        np.array(sids, dtype=int),
                         t_stop=t_stop,
                         units="ms",
                         t_start=self._recording_start_time,
                         source_population=self.population.label,
-                        source_id = sids, source_index=[self.population.id_to_index(sid) for sid in sids]
+                        source_id = sids,
+                        source_index=[self.population.id_to_index(sid) for sid in sids]
                     )
                     segment.spiketrains.segment = segment
             else:
                 ids = sorted(self.filter_recorded(variable, filter_ids))
                 signal_array, times_array = self._get_all_signals(variable, ids, clear=clear)
                 mpi_node = self._simulator.state.mpi_rank  # for debugging
+                t_stop = self._simulator.state.t * pq.ms # must run on all MPI nodes
+                current_time = self._simulator.state.t * pq.ms # must run on all MPI nodes
+
                 if signal_array.size > 0:
                     # may be empty if none of the recorded cells are on this MPI node
                     units = self.population.find_units(variable)
@@ -370,9 +374,7 @@ class Recorder(object):
                             signal.segment = segment
                     else:
                         t_start = self._recording_start_time
-                        t_stop = self._simulator.state.t * pq.ms
                         sampling_period = self.sampling_interval * pq.ms
-                        current_time = self._simulator.state.t * pq.ms
                         signal = neo.AnalogSignal(
                             signal_array,
                             units=units,
