@@ -92,3 +92,12 @@ class CondBetaPostSynapticResponse(StandardPostSynapticResponse):
         "gsyn": "uS"
     }
     conductance_based = True
+
+    def get_schema(self):
+        schema = super().get_schema()
+        schema.pop("tau_syn", None)
+        schema.update({
+            "tau_rise": float,
+            "tau_decay": float,
+        })
+        return schema
