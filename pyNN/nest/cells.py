@@ -16,6 +16,8 @@ from . import conversion
 UNITS_MAP = {
     'spikes': 'ms',
     'V_m': 'mV',
+    'g_ex': 'nS',
+    'g_in': 'nS',
     'I_syn_ex': 'pA',
     'I_syn_in': 'pA'
 }
