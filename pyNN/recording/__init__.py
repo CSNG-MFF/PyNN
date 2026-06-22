@@ -341,7 +341,7 @@ class Recorder(object):
                         units="ms",
                         t_start=self._recording_start_time,
                         source_population=self.population.label,
-                        source_index=self.population.id_to_index(channel_ids)
+                        source_index=[self.population.id_to_index(id) for id in channel_ids]
                     )
                     segment.spiketrains.segment = segment
             else:
