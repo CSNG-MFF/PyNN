@@ -23,6 +23,7 @@ import os.path
 import logging
 import tempfile
 import warnings
+from contextlib import contextmanager
 import numpy as np
 
 import nest
@@ -151,15 +152,37 @@ class _State(common.control.BaseState):
         self.populations = []  # needed for reset
         self.current_sources = []
         self._time_offset = 0.0
+        self._frozen_time = None
         self.t_flush = -1
         self.stale_connection_cache = False
+
+    def _get_current_time(self):
+        return max(np.around(self.t_kernel - self.min_delay - self._time_offset,
+                             decimals=12), 0.0)
 
     @property
     def t(self):
         # note that we always simulate one min delay past the requested time
         # we round to try to reduce floating-point problems
         # longer-term, we should probably work with integers (in units of time step)
-        return max(np.around(self.t_kernel - self.min_delay - self._time_offset, decimals=12), 0.0)
+        if self._frozen_time is not None:
+            return self._frozen_time
+        return self._get_current_time()
+
+    @contextmanager
+    def freeze_time(self):
+        """Return a stable simulation time within the context."""
+        previous = self._frozen_time
+        if previous is None:
+            self._frozen_time = self._get_current_time()
+        try:
+            yield self._frozen_time
+        finally:
+            self._frozen_time = previous
+
+    def _assert_time_not_frozen(self, operation):
+        if self._frozen_time is not None:
+            raise RuntimeError("Cannot %s while simulation time is frozen" % operation)
 
     t_kernel = nest_property("biological_time", float)
 
@@ -239,6 +262,7 @@ class _State(common.control.BaseState):
 
     def run(self, simtime):
         """Advance the simulation for a certain time."""
+        self._assert_time_not_frozen("run")
         for population in self.populations:
             if population._deferred_parrot_connections:
                 population._connect_parrot_neurons()
@@ -258,6 +282,7 @@ class _State(common.control.BaseState):
         self.run(tstop - self.t)
 
     def reset(self):
+        self._assert_time_not_frozen("reset")
         if self.t > 0:
             if self.t_flush < 0:
                 raise ValueError(
@@ -296,6 +321,7 @@ class _State(common.control.BaseState):
         self.segment_counter += 1
 
     def clear(self):
+        self._assert_time_not_frozen("clear")
         self.populations = []
         self.current_sources = []
         self.recording_devices = []
