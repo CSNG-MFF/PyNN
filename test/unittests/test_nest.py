@@ -16,6 +16,7 @@ else:
 
 from pyNN.standardmodels import StandardCellType
 import unittest
+from unittest.mock import patch
 import numpy as np
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 
@@ -80,6 +81,24 @@ class TestPopulation(unittest.TestCase):
 
     def test_set_parameters_scalar(self):
         self.p[0:1].set(tau_m=20.)
+
+    def test_freeze_time_uses_one_biological_time_query(self):
+        self.p.record("v")
+        sim.run(1.0)
+        with patch.object(sim.state, "_get_current_time",
+                          wraps=sim.state._get_current_time) as get_current_time:
+            with sim.state.freeze_time() as frozen_time:
+                self.assertEqual(frozen_time, 1.0)
+                self.p.get_data(clear=False)
+                self.p.get_data(clear=True)
+            self.assertEqual(get_current_time.call_count, 1)
+            sim.get_current_time()
+            self.assertEqual(get_current_time.call_count, 2)
+
+    def test_cannot_run_while_time_is_frozen(self):
+        with sim.state.freeze_time():
+            with self.assertRaisesRegex(RuntimeError, "simulation time is frozen"):
+                sim.run(1.0)
 
 
 @unittest.skipUnless(nest, "Requires NEST")
