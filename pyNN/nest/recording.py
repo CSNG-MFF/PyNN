@@ -95,7 +95,10 @@ class RecordingDevice(object):
 
         desired_and_existing_ids = np.intersect1d(
             np.array(list(recorded_ids)), np.array(desired_ids))
-        data = {k: data[k] for k in desired_and_existing_ids}
+        # Keep public dictionary keys as plain neuron IDs. Retaining NumPy
+        # scalar keys makes later lookup with PyNN ID objects probe
+        # ID.__array_priority__, which IDMixin treats as a cell parameter.
+        data = {int(k): data[k] for k in desired_and_existing_ids}
 
         if variable != 'times':
             if variable not in self._initial_values:
