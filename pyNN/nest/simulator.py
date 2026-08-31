@@ -104,10 +104,14 @@ def build_extensions(build_dir=None):
 # --- For implementation of get_time_step() and similar functions --------------
 
 
-def nest_property(name, dtype):
+def nest_property(name, dtype, frozen_attribute=None):
     """Return a property that accesses a NEST kernel parameter"""
 
     def _get(self):
+        if frozen_attribute is not None:
+            frozen_value = getattr(self, frozen_attribute)
+            if frozen_value is not None:
+                return frozen_value
         return nest.GetKernelStatus(name)
 
     def _set(self, val):
@@ -160,6 +164,7 @@ class _State(common.control.BaseState):
         self.current_sources = []
         self._time_offset = 0.0
         self._frozen_time = None
+        self._frozen_t_kernel = None
         self.t_flush = -1
         self.stale_connection_cache = False
 
@@ -178,20 +183,23 @@ class _State(common.control.BaseState):
 
     @contextmanager
     def freeze_time(self):
-        """Return a stable simulation time within the context."""
-        previous = self._frozen_time
-        if previous is None:
-            self._frozen_time = self._get_current_time()
+        """Return stable PyNN and NEST kernel times within the context."""
+        previous_time = self._frozen_time
+        previous_t_kernel = self._frozen_t_kernel
         try:
+            if previous_time is None:
+                self._frozen_t_kernel = nest.GetKernelStatus("biological_time")
+                self._frozen_time = self._get_current_time()
             yield self._frozen_time
         finally:
-            self._frozen_time = previous
+            self._frozen_time = previous_time
+            self._frozen_t_kernel = previous_t_kernel
 
     def _assert_time_not_frozen(self, operation):
         if self._frozen_time is not None:
             raise RuntimeError("Cannot %s while simulation time is frozen" % operation)
 
-    t_kernel = nest_property("biological_time", float)
+    t_kernel = nest_property("biological_time", float, "_frozen_t_kernel")
 
     dt = nest_property('resolution', float)
 

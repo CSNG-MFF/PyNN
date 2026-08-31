@@ -89,6 +89,8 @@ class TestPopulation(unittest.TestCase):
                           wraps=sim.state._get_current_time) as get_current_time:
             with sim.state.freeze_time() as frozen_time:
                 self.assertEqual(frozen_time, 1.0)
+                with patch.dict(nest.__dict__, {"GetKernelStatus": None}):
+                    self.assertIsInstance(sim.state.t_kernel, float)
                 self.p.get_data(clear=False)
                 self.p.get_data(clear=True)
             self.assertEqual(get_current_time.call_count, 1)
